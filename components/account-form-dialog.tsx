@@ -23,6 +23,7 @@ interface AccountFormDialogProps {
 export function AccountFormDialog({ isOpen, onClose, account }: AccountFormDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accountType, setAccountType] = useState(account?.type || 'chequing');
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -32,15 +33,17 @@ export function AccountFormDialog({ isOpen, onClose, account }: AccountFormDialo
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
-      // Reset submitting state when dialog opens
+      // Reset submitting state and account type when dialog opens
       setIsSubmitting(false);
+      setAccountType(account?.type || 'chequing');
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, account?.id, account?.type]);
 
   if (!isOpen) return null;
 
@@ -104,7 +107,8 @@ export function AccountFormDialog({ isOpen, onClose, account }: AccountFormDialo
             <select
               id="type"
               name="type"
-              defaultValue={account?.type || 'chequing'}
+              value={accountType}
+              onChange={(e) => setAccountType(e.target.value)}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -116,7 +120,11 @@ export function AccountFormDialog({ isOpen, onClose, account }: AccountFormDialo
           </div>
 
           <div>
-            <Label htmlFor="starting_balance">Starting Balance</Label>
+            <Label htmlFor="starting_balance">
+              {accountType === 'credit_card' || accountType === 'line_of_credit' 
+                ? 'Balance Owed' 
+                : 'Starting Balance'}
+            </Label>
             <Input
               id="starting_balance"
               name="starting_balance"
