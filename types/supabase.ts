@@ -115,7 +115,7 @@ export type Database = {
           },
         ]
       }
-      merchants: {
+      payees: {
         Row: {
           created_at: string | null
           deleted_at: string | null
@@ -273,7 +273,7 @@ export type Database = {
             foreignKeyName: "transactions_merchant_id_fkey"
             columns: ["merchant_id"]
             isOneToOne: false
-            referencedRelation: "merchants"
+            referencedRelation: "payees"
             referencedColumns: ["id"]
           },
           {

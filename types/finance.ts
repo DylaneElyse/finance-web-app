@@ -9,7 +9,7 @@ export type Enums<T extends keyof Database['public']['Enums']> = Database['publi
 export type Account = Tables<'accounts'>
 export type Category = Tables<'categories'>
 export type Subcategory = Tables<'subcategories'>
-export type Merchant = Tables<'merchants'>
+export type Payee = Tables<'payees'>
 export type Transaction = Tables<'transactions'>
 export type Budget = Tables<'monthly_budgets'>
 export type Goal = Tables<'goals'>
@@ -22,7 +22,7 @@ export type TransactionType = Enums<'transaction_type'>
 // This uses TypeScript's '&' to combine the base transaction with its related data
 export type TransactionWithDetails = Transaction & {
   accounts?: Account | null
-  merchants?: Merchant | null
+  payees?: Payee | null
   subcategories?: (Subcategory & { 
     categories: Category 
   }) | null
