@@ -5,9 +5,8 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   ReceiptText, 
-  Wallet, 
+  ClipboardList, 
   Landmark, 
-  Target, 
   Settings,
   X 
 } from "lucide-react";
@@ -19,9 +18,8 @@ import type { Account } from "@/types/finance";
 const routes = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/protected/dashboard" },
   { label: "Transactions", icon: ReceiptText, href: "/protected/transactions" },
-  { label: "Budget", icon: Wallet, href: "/protected/budget" },
+  { label: "Plan", icon: ClipboardList, href: "/protected/plan" },
   { label: "Accounts", icon: Landmark, href: "/protected/accounts" },
-  { label: "Goals", icon: Target, href: "/protected/goals" },
   { label: "Settings", icon: Settings, href: "/protected/settings" },
 ];
 
@@ -105,10 +103,19 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             <div className="space-y-1">
               {accounts.map((account) => {
                 const balance = account.current_balance ?? 0;
+                const accountTransactionsPath = `/protected/accounts/${account.id}/transactions`;
+                const isActive = pathname === accountTransactionsPath;
+                
                 return (
-                  <div
+                  <Link
                     key={account.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                    href={accountTransactionsPath}
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
+                      isActive 
+                        ? "bg-blue-100 text-blue-700" 
+                        : "text-slate-600 hover:bg-slate-200"
+                    )}
                     onClick={onClose}
                   >
                     <div className="flex items-center gap-x-2 min-w-0">
@@ -121,7 +128,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     )}>
                       {formatCurrency(balance)}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

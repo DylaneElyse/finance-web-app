@@ -31,5 +31,9 @@ export async function TransactionsList() {
     );
   }
 
-  return <TransactionsTable transactions={transactions} />;
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      <TransactionsTable transactions={transactions} />
+    </div>
+  );
 }

@@ -143,7 +143,7 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
               id="account_id"
               name="account_id"
               defaultValue={transaction?.account_id}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
               disabled={loadingAccounts}
             >
