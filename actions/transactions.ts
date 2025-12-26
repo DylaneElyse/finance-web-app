@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
 
 export async function createTransaction(formData: FormData) {
   const supabase = await createClient();
@@ -71,8 +70,8 @@ export async function createTransaction(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/accounts');
+  // Client-side components handle their own state updates
+  // No need to revalidate and cause page reload
   return { success: true };
 }
 
@@ -145,8 +144,7 @@ export async function updateTransaction(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/accounts');
+  // Client-side components handle their own state updates
   return { success: true };
 }
 
@@ -163,6 +161,6 @@ export async function deleteTransaction(transactionId: string) {
     return { error: error.message };
   }
 
-  revalidatePath('/protected/transactions');
+  // Client-side components handle their own state updates
   return { success: true };
 }

@@ -182,7 +182,7 @@ export default function Plan() {
                   <h2 className="text-lg font-bold text-slate-800">{category.name}</h2>
                   <div className="text-sm font-semibold text-slate-600">
                     Total: {formatCurrency(
-                      category.subcategories.reduce((sum, sub) => sum + sub.assigned, 0)
+                      category.subcategories.reduce((sum, sub) => sum + sub.available, 0)
                     )}
                   </div>
                 </div>

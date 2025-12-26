@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
 
 export async function createCategory(name: string) {
   const supabase = await createClient();
@@ -47,9 +46,7 @@ export async function createCategory(name: string) {
     throw new Error('Failed to create category');
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return data;
 }
 
@@ -103,9 +100,7 @@ export async function createSubcategory(name: string, categoryId: string) {
     throw new Error('Failed to create subcategory');
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return data;
 }
 
@@ -202,9 +197,7 @@ export async function updateCategory(id: string, name: string) {
     throw new Error('Failed to update category');
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return data;
 }
 
@@ -265,9 +258,7 @@ export async function updateSubcategory(id: string, name: string) {
     throw new Error('Failed to update subcategory');
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return data;
 }
 
@@ -302,9 +293,7 @@ export async function deleteCategory(id: string) {
     .eq('category_id', id)
     .eq('user_id', user.id);
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return { success: true };
 }
 
@@ -332,8 +321,6 @@ export async function deleteSubcategory(id: string) {
     throw new Error('Failed to delete subcategory');
   }
 
-  revalidatePath('/protected/transactions');
-  revalidatePath('/protected/settings/categories');
-  revalidatePath('/protected/plan');
+  // Client-side components handle their own state updates
   return { success: true };
 }
