@@ -70,29 +70,48 @@ export default function Plan() {
       return;
     }
 
+    // Store previous state for rollback
+    const previousData = planData;
+
     try {
       // Optimistic Update
       setPlanData(prev => {
         if (!prev) return null;
+        
+        // Calculate the difference in assignment
+        let assignmentDiff = 0;
+        prev.categories.forEach(cat => {
+          cat.subcategories.forEach(sub => {
+            if (sub.id === subcategoryId) {
+              assignmentDiff = amount - sub.assigned;
+            }
+          });
+        });
+        
         return {
           ...prev,
+          readyToAssign: prev.readyToAssign - assignmentDiff,
+          totalAssigned: prev.totalAssigned + assignmentDiff,
           categories: prev.categories.map(cat => ({
             ...cat,
             subcategories: cat.subcategories.map(sub => 
-              sub.id === subcategoryId ? { ...sub, assigned: amount, available: amount - sub.spent } : sub
+              sub.id === subcategoryId 
+                ? { ...sub, assigned: amount, available: amount - sub.spent } 
+                : sub
             )
           }))
         };
       });
 
-      await updateAssignedAmount(subcategoryId, planData.monthYear, amount);
       setEditingSubcategory(null);
-      // Refresh to get accurate data
-      await loadPlanData();
+      
+      // Save to server in background
+      await updateAssignedAmount(subcategoryId, planData.monthYear, amount);
     } catch (error) {
       console.error("Error updating assigned amount:", error);
-      alert("Failed to update budget");
-      loadPlanData(); // Rollback on error
+      alert("Failed to update budget. Rolling back changes.");
+      // Rollback to previous state on error
+      setPlanData(previousData);
     }
   }
 

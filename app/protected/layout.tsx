@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/sidebar";
 import { Suspense } from "react";
+import { LayoutContent } from "../../components/layout-content";
 
 export default function ProtectedLayout({
   children,
@@ -18,9 +19,9 @@ export default function ProtectedLayout({
       }>
         <Sidebar />
       </Suspense>
-      <div className="ml-64 flex-1 flex flex-col">
+      <LayoutContent>
         {children}
-      </div>
+      </LayoutContent>
     </main>
   );
 }

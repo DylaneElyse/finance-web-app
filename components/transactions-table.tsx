@@ -154,12 +154,19 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
 
     const fetchCategories = async () => {
       const supabase = createClient();
-      const { data } = await supabase
+      console.log('Fetching categories from database...');
+      const { data, error } = await supabase
         .from('categories')
         .select('*')
         .is('deleted_at', null)
         .order('name');
-      if (data) {
+      
+      console.log('Categories fetch result:', { data, error });
+      
+      if (error) {
+        console.error('Error fetching categories:', error);
+      } else if (data) {
+        console.log('Setting categories state with:', data);
         setCategories(data);
         // Set first category as default
         if (data.length > 0 && !newCategoryParentId) {
@@ -554,38 +561,45 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
 
     try {
       const result = await createSubcategory(newCategoryName.trim(), newCategoryParentId);
-      if (!result) {
-        alert('Failed to create subcategory');
-      } else {
-        // Refresh subcategories list
-        const supabase = createClient();
-        const { data } = await supabase
-          .from('subcategories')
-          .select('*, categories(*)')
-          .is('deleted_at', null)
-          .order('name');
-        if (data) {
-          setSubcategories(data);
-          const displayName = result.data.categories?.name 
-            ? `${result.data.categories.name}: ${result.data.name}` 
-            : result.data.name;
+      console.log('Subcategory creation result:', result);
+      
+      // Refresh subcategories list
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('subcategories')
+        .select('*, categories(*)')
+        .is('deleted_at', null)
+        .order('name');
+      
+      if (data) {
+        setSubcategories(data);
+        
+        // Find the newly created subcategory (it should be the one we just created)
+        const newSubcat = data.find(s => s.name === newCategoryName.trim() && s.category_id === newCategoryParentId);
+        
+        if (newSubcat) {
+          const displayName = newSubcat.categories?.name 
+            ? `${newSubcat.categories.name}: ${newSubcat.name}` 
+            : newSubcat.name;
           
           // Set the newly created category in the appropriate transaction (new or editing)
           if (editingTransaction) {
-            setEditingTransaction({ ...editingTransaction, subcategory_id: result.data.id });
+            setEditingTransaction({ ...editingTransaction, subcategory_id: newSubcat.id });
             setEditCategorySearchTerm(displayName);
           } else {
-            setNewTransaction({ ...newTransaction, subcategory_id: result.data.id });
+            setNewTransaction({ ...newTransaction, subcategory_id: newSubcat.id });
             setCategorySearchTerm(displayName);
           }
         }
-        // Close dialog
-        setShowAddCategoryDialog(false);
-        setNewCategoryName('');
       }
+      
+      // Close dialog
+      setShowAddCategoryDialog(false);
+      setNewCategoryName('');
     } catch (error) {
       console.error('Error creating subcategory:', error);
-      alert('Failed to create subcategory');
+      const message = error instanceof Error ? error.message : 'Failed to create subcategory';
+      alert(message);
     } finally {
       setIsSavingCategory(false);
     }
