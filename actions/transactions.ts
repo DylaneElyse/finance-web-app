@@ -164,3 +164,74 @@ export async function deleteTransaction(transactionId: string) {
   // Client-side components handle their own state updates
   return { success: true };
 }
+
+// PHASE 6: Get deleted transactions for recovery
+export async function getDeletedTransactions() {
+  const supabase = await createClient();
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { error: 'User not authenticated' };
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(50); // Limit to last 50 deleted items
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { data: data || [] };
+}
+
+// PHASE 6: Restore a deleted transaction
+export async function restoreTransaction(transactionId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { error: 'User not authenticated' };
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .update({ deleted_at: null })
+    .eq('id', transactionId)
+    .eq('user_id', user.id); // Security: only restore own transactions
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}
+
+// PHASE 6: Permanently delete a transaction
+export async function permanentlyDeleteTransaction(transactionId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { error: 'User not authenticated' };
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', transactionId)
+    .eq('user_id', user.id); // Security: only delete own transactions
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}

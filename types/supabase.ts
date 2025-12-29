@@ -146,7 +146,9 @@ export type Database = {
           created_at: string | null
           id: string
           month_year: string
+          notes: string | null
           subcategory_id: string
+          target_amount: number | null
           user_id: string
         }
         Insert: {
@@ -155,7 +157,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           month_year: string
+          notes?: string | null
           subcategory_id: string
+          target_amount?: number | null
           user_id: string
         }
         Update: {
@@ -164,7 +168,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           month_year?: string
+          notes?: string | null
           subcategory_id?: string
+          target_amount?: number | null
           user_id?: string
         }
         Relationships: [
