@@ -44,6 +44,9 @@ type Subcategory = {
   assigned: number;
   spent: number;
   available: number;
+  carryover: number;
+  inflow: number;
+  outflow: number;
   goal: Goal | null;
 };
 
@@ -581,25 +584,29 @@ export default function Plan() {
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed">
                   <colgroup>
-                    <col className="w-[40%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[15%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
                     <col className="w-[15%]" />
                   </colgroup>
                   <thead>
                     <tr className="bg-slate-50 border-b text-sm text-slate-600">
                       <th className="text-left px-6 py-3 font-semibold">Subcategory</th>
                       <th className="text-right px-6 py-3 font-semibold">Planned</th>
+                      <th className="text-right px-6 py-3 font-semibold">Carryover</th>
                       <th className="text-right px-6 py-3 font-semibold">Assigned</th>
-                      <th className="text-right px-6 py-3 font-semibold">Spent</th>
+                      <th className="text-right px-6 py-3 font-semibold">In</th>
+                      <th className="text-right px-6 py-3 font-semibold">Out</th>
                       <th className="text-right px-6 py-3 font-semibold">Available</th>
                     </tr>
                   </thead>
                   <tbody>
                     {category.subcategories.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 text-slate-400 text-sm">
+                        <td colSpan={7} className="text-center py-8 text-slate-400 text-sm">
                           No subcategories in this category
                         </td>
                       </tr>
@@ -645,6 +652,11 @@ export default function Plan() {
                             <td className="px-6 py-4 text-right font-medium text-slate-700 tabular-nums">
                               {subcategory.planned > 0 ? formatCurrency(subcategory.planned) : '-'}
                             </td>
+                            <td className="px-6 py-4 text-right font-medium tabular-nums">
+                              <span className={subcategory.carryover < 0 ? 'text-red-600' : subcategory.carryover > 0 ? 'text-slate-700' : 'text-slate-400'}>
+                                {subcategory.carryover !== 0 ? formatCurrency(subcategory.carryover) : '-'}
+                              </span>
+                            </td>
                             <td className="px-6 py-4 text-right tabular-nums">
                               {editingSubcategory === subcategory.id ? (
                                 <input
@@ -678,7 +690,7 @@ export default function Plan() {
                               )}
                             </td>
                             <td className="px-6 py-4 text-right font-medium tabular-nums">
-                              {subcategory.spent > 0 ? (
+                              {subcategory.inflow !== 0 ? (
                                 <button
                                   onClick={async () => {
                                     setDialogSubcategory(subcategory);
@@ -693,12 +705,36 @@ export default function Plan() {
                                       setLoadingAllTransactions(false);
                                     }
                                   }}
-                                  className="text-slate-600 hover:text-blue-600 hover:underline cursor-pointer"
+                                  className="text-green-600 hover:text-blue-600 hover:underline cursor-pointer"
                                 >
-                                  {formatCurrency(subcategory.spent)}
+                                  {formatCurrency(subcategory.inflow)}
                                 </button>
                               ) : (
-                                <span className="text-slate-600">{formatCurrency(subcategory.spent)}</span>
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right font-medium tabular-nums">
+                              {subcategory.outflow !== 0 ? (
+                                <button
+                                  onClick={async () => {
+                                    setDialogSubcategory(subcategory);
+                                    setTransactionsDialogOpen(true);
+                                    setLoadingAllTransactions(true);
+                                    try {
+                                      const txns = await getSubcategoryTransactions(subcategory.id, currentMonth, 1000);
+                                      setAllTransactions(txns);
+                                    } catch (error) {
+                                      console.error("Error loading all transactions:", error);
+                                    } finally {
+                                      setLoadingAllTransactions(false);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-blue-600 hover:underline cursor-pointer"
+                                >
+                                  {formatCurrency(subcategory.outflow)}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400">-</span>
                               )}
                             </td>
                             <td className="px-6 py-4 text-right tabular-nums">

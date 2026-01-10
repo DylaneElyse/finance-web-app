@@ -163,6 +163,27 @@ let carryoverFromCategories = 0;
       // Carryover = Everything assigned before this month - Everything spent before this month
       const carryover = allTimeAssignedBeforeCurrentMonth - allTimeSpentBeforeCurrent;
 
+      // Calculate In/Out for current month
+      const currentMonthTxns = allTransactions?.filter(t => 
+        t.subcategory_id === sub.id && 
+        t.date >= dbMonthDate && 
+        t.date < nextMonthDbDate
+      ) || [];
+      
+      const outflow = currentMonthTxns
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => {
+          const amt = Number(t.amount);
+          return sum + (isNaN(amt) ? 0 : Math.abs(amt));
+        }, 0);
+      
+      const inflow = currentMonthTxns
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => {
+          const amt = Number(t.amount);
+          return sum + (isNaN(amt) ? 0 : Math.abs(amt));
+        }, 0);
+
       // Available = Carryover + Assigned this month - Spent this month
       const available = carryover + assigned - spent;
       
@@ -193,6 +214,8 @@ let carryoverFromCategories = 0;
         spent,
         available,
         carryover,
+        inflow,
+        outflow,
         goal: goal ? {
           id: goal.id,
           name: goal.name,
