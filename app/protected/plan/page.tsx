@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlanData, updateAssignedAmount, upsertMonthlyBudget, upsertGoal, getSubcategoryTransactions, getMonthlyBudgetNotes, moveMoneyBetweenSubcategories } from "@/actions/plan";
 import { Target, ChevronDown, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, TrendingUp, AlertCircle, Edit2, Plus, ArrowRightLeft } from "lucide-react";
@@ -634,7 +634,8 @@ export default function Plan() {
                         const isCurrentMonth = todayMonth && currentMonth === todayMonth;
                         
                         return (
-                          <tr key={subcategory.id} className="border-b hover:bg-slate-50 transition-colors">
+                          <React.Fragment key={subcategory.id}>
+                          <tr className="border-b hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 <button
@@ -786,6 +787,58 @@ export default function Plan() {
                               </div>
                             </td>
                           </tr>
+                          {/* Progress Bar Row */}
+                          <tr key={`${subcategory.id}-progress`} className="border-b hover:bg-slate-50 transition-colors">
+                            <td colSpan={7} className="px-6 py-2">
+                              {(() => {
+                                // Calculate amounts
+                                const total = subcategory.carryover + subcategory.assigned + subcategory.inflow;
+                                const spent = subcategory.outflow;
+                                
+                                // Determine the max value for the bar (or minimum of 1 to avoid division by zero)
+                                const maxValue = subcategory.planned > 0 ? subcategory.planned : Math.max(total, spent, 1);
+                                
+                                // Calculate percentages based on maxValue
+                                const totalPercent = (total / maxValue) * 100;
+                                const spentPercent = (spent / maxValue) * 100;
+                                
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    {/* Outer light grey shell - always visible */}
+                                    <div className="flex-1 h-6 bg-slate-200 rounded overflow-hidden border border-slate-300 relative p-0.5">
+                                      {/* Inner green bar - shows total available funds with slight inset */}
+                                      {total > 0 && (
+                                        <div
+                                          className="absolute left-1 top-1 bottom-1 bg-green-500 rounded-sm transition-all"
+                                          style={{ width: `calc(${Math.min(100, totalPercent)}% - 8px)` }}
+                                          title={`Total Available: ${formatCurrency(total)}`}
+                                        />
+                                      )}
+                                      
+                                      {/* Red bar - shows spending, nested inside green with additional inset */}
+                                      {spent > 0 && (
+                                        <div
+                                          className="absolute left-2 top-2 bottom-2 bg-red-500 rounded-sm transition-all"
+                                          style={{ 
+                                            width: `calc(${Math.min(100, spentPercent)}% - 16px)`,
+                                          }}
+                                          title={spent > total ? `Overspent by: ${formatCurrency(spent - total)}` : `Spent: ${formatCurrency(spent)}`}
+                                        />
+                                      )}
+                                    </div>
+                                    
+                                    {/* Percentage indicator */}
+                                    {subcategory.planned > 0 && total > 0 && (
+                                      <span className="text-xs text-slate-600 font-medium whitespace-nowrap w-12 text-right">
+                                        {Math.round(totalPercent)}%
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        </React.Fragment>
                         );
                       })
                     )}
