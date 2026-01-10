@@ -28,17 +28,20 @@ export async function createTransaction(formData: FormData) {
     type = 'income';
     amount = inflow; // Positive for income
     
-    // FORCE all income to "Ready to Assign" subcategory
-    const { data: readyToAssign } = await supabase
-      .from('subcategories')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('name', 'Ready to Assign')
-      .is('deleted_at', null)
-      .single();
-    
-    if (readyToAssign) {
-      subcategoryId = readyToAssign.id;
+    // Allow user to manually select category (e.g., Account Transfer)
+    // If no category selected, default to Ready to Assign
+    if (!subcategoryId) {
+      const { data: readyToAssign } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', 'Ready to Assign')
+        .is('deleted_at', null)
+        .single();
+      
+      if (readyToAssign) {
+        subcategoryId = readyToAssign.id;
+      }
     }
   } else if (outflow > 0) {
     type = 'expense';
@@ -115,17 +118,20 @@ export async function updateTransaction(formData: FormData) {
     type = 'income';
     amount = inflow;
     
-    // FORCE all income to "Ready to Assign" subcategory
-    const { data: readyToAssign } = await supabase
-      .from('subcategories')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('name', 'Ready to Assign')
-      .is('deleted_at', null)
-      .single();
-    
-    if (readyToAssign) {
-      subcategoryId = readyToAssign.id;
+    // Allow user to manually select category (e.g., Account Transfer)
+    // If no category selected, default to Ready to Assign
+    if (!subcategoryId) {
+      const { data: readyToAssign } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', 'Ready to Assign')
+        .is('deleted_at', null)
+        .single();
+      
+      if (readyToAssign) {
+        subcategoryId = readyToAssign.id;
+      }
     }
   } else if (outflow > 0) {
     type = 'expense';

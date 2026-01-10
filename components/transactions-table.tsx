@@ -936,14 +936,26 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
                       <input
                         type="text"
                         value={editCategorySearchTerm}
-                        onChange={(e) => handleEditCategoryInputChange(e.target.value)}
+                        onChange={(e) => {
+                          handleEditCategoryInputChange(e.target.value);
+                          // Clear the subcategory_id when user starts typing
+                          if (editingTransaction) {
+                            setEditingTransaction({ ...editingTransaction, subcategory_id: '' });
+                          }
+                        }}
                         onKeyDown={handleEditCategoryKeyDown}
-                        onFocus={() => setShowEditCategorySuggestions(true)}
+                        onFocus={() => {
+                          setShowEditCategorySuggestions(true);
+                          // Show all options when focused
+                          if (!editCategorySearchTerm) {
+                            setEditCategorySearchTerm('');
+                          }
+                        }}
                         onBlur={() => setTimeout(() => {
                           setShowEditCategorySuggestions(false);
                           setSelectedEditCategoryIndex(-1);
                         }, 200)}
-                        placeholder="Type category..."
+                        placeholder="Type to search or clear to see all..."
                         className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                         disabled={loadingSubcategories}
                       />

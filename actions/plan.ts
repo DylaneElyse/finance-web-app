@@ -17,10 +17,6 @@ export async function getPlanData(monthYear?: string) {
   nextMonthDateObj.setMonth(nextMonthDateObj.getMonth() + 1);
   const nextMonthDbDate = nextMonthDateObj.toISOString().split('T')[0];
 
-  const prevMonthDateObj = new Date(dbMonthDate);
-  prevMonthDateObj.setMonth(prevMonthDateObj.getMonth() - 1);
-  const prevDbMonthDate = prevMonthDateObj.toISOString().split('T')[0];
-
   // 2. Fetch Categories & Subcategories (Exclude "Ignore" from UI)
   const { data: categories, error: catError } = await supabase
     .from("categories")
@@ -31,46 +27,53 @@ export async function getPlanData(monthYear?: string) {
     .order("name");
   if (catError) throw catError;
 
-  // 3. Fetch Budgets (Current and Previous for Carryover)
+  // 3. Fetch Budgets (Current month only)
   const { data: budgets } = await supabase
     .from("monthly_budgets")
     .select("*")
     .eq("user_id", user.id)
-    .in("month_year", [dbMonthDate, prevDbMonthDate]);
+    .eq("month_year", dbMonthDate);
 
-  const monthlyBudgets = budgets?.filter(b => b.month_year === dbMonthDate) || [];
-  const prevMonthBudgets = budgets?.filter(b => b.month_year === prevDbMonthDate) || [];
+  const monthlyBudgets = budgets || [];
 
-  // 4. Fetch Transactions (Current and Previous for Spent/Carryover)
+  // 4. Fetch Transactions (ALL TIME for proper carryover, and current month)
   const { data: allTransactions } = await supabase
     .from("transactions")
     .select("subcategory_id, amount, type, date")
     .eq("user_id", user.id)
-    .is("deleted_at", null)
-    .gte("date", prevDbMonthDate)
-    .lt("date", nextMonthDbDate);
+    .is("deleted_at", null);
 
-  // Spent Maps
+  // Spent Maps - Current month and All time up to (but not including) current month
   const spentMap: Record<string, number> = {};
-  const prevSpentMap: Record<string, number> = {};
+  const allTimeSpentBeforeCurrentMonth: Record<string, number> = {};
 
   allTransactions?.forEach(t => {
     const val = Math.abs(Number(t.amount));
-    const isCurrent = t.date >= dbMonthDate;
-    const targetMap = isCurrent ? spentMap : prevSpentMap;
+    const isCurrent = t.date >= dbMonthDate && t.date < nextMonthDbDate;
+    const isBeforeCurrent = t.date < dbMonthDate;
 
     if (t.subcategory_id) {
       if (t.type === 'expense') {
-        targetMap[t.subcategory_id] = (targetMap[t.subcategory_id] || 0) + val;
+        if (isCurrent) {
+          spentMap[t.subcategory_id] = (spentMap[t.subcategory_id] || 0) + val;
+        }
+        if (isBeforeCurrent) {
+          allTimeSpentBeforeCurrentMonth[t.subcategory_id] = (allTimeSpentBeforeCurrentMonth[t.subcategory_id] || 0) + val;
+        }
       } else if (t.type === 'income') {
-        targetMap[t.subcategory_id] = (targetMap[t.subcategory_id] || 0) - val;
+        if (isCurrent) {
+          spentMap[t.subcategory_id] = (spentMap[t.subcategory_id] || 0) - val;
+        }
+        if (isBeforeCurrent) {
+          allTimeSpentBeforeCurrentMonth[t.subcategory_id] = (allTimeSpentBeforeCurrentMonth[t.subcategory_id] || 0) - val;
+        }
       }
     }
   });
 
-// 5. READY TO ASSIGN (RTA) CALCULATION - The "Inflow vs Assigned" Method
+// 5. READY TO ASSIGN (RTA) CALCULATION - Monthly View with Carryover
 
-// A. Find IDs of Inflow subcategories (Already in your code)
+// A. Find IDs of Inflow subcategories
 const { data: inflowSubs } = await supabase
   .from("subcategories")
   .select("id")
@@ -78,43 +81,55 @@ const { data: inflowSubs } = await supabase
   .in("name", ["Ready to Assign", "Starting Balance"]);
 const inflowIds = inflowSubs?.map(s => s.id) || [];
 
-// B. Sum inflow transactions BUT ONLY from Cash Accounts (Chequing/Savings)
-// We use !inner join to filter the transactions by the account type
-const { data: inflowTxns, error: inflowError } = await supabase
-  .from("transactions")
-  .select(`
-    amount,
-    accounts!inner ( type )
-  `)
-  .eq("user_id", user.id)
-  .is("deleted_at", null)
-  .in("subcategory_id", inflowIds)
-  .in("accounts.type", ["chequing", "savings"]); // This is the fix!
+// B. Sum INCOME transactions from Cash Accounts (Chequing/Savings) - current month only
+// Exclude Account Transfers as they just move money around and don't create new income
+let totalInflowCurrentMonth = 0;
+if (inflowIds.length > 0) {
+  const { data, error: inflowError } = await supabase
+    .from("transactions")
+    .select(`
+      amount,
+      date,
+      payee,
+      accounts!transactions_account_id_fkey ( type )
+    `)
+    .eq("user_id", user.id)
+    .eq("type", "income")  // Only income transactions
+    .neq("payee", "Account Transfer")  // Exclude account transfers
+    .is("deleted_at", null)
+    .in("subcategory_id", inflowIds)
+    .in("accounts.type", ["chequing", "savings"])
+    .gte("date", dbMonthDate)
+    .lt("date", nextMonthDbDate);
 
-if (inflowError) console.error("RTA Calculation Error:", inflowError);
+  if (inflowError) {
+    console.error("Income Calculation Error:", inflowError);
+  } else {
+    const incomeTxns = (data || []) as Array<{ amount: number; date: string }>;
+    totalInflowCurrentMonth = incomeTxns.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  }
+}
 
-const totalInflow = inflowTxns?.reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
-
-// C. Total Assigned (No change needed here)
+// C. Get all assigned records
 const { data: allAssignedRecords } = await supabase
   .from("monthly_budgets")
-  .select("assigned_amount, subcategory_id")
+  .select("assigned_amount, subcategory_id, month_year")
   .eq("user_id", user.id);
-const totalAssignedAllTime = allAssignedRecords?.reduce((sum, b) => sum + Number(b.assigned_amount || 0), 0) || 0;
 
-// D. RTA = Cash In - Cash Assigned
-const readyToAssign = totalInflow - totalAssignedAllTime;
+let totalAssignedCurrentMonth = 0;
 
-  // 6. TOTAL CASH (Sanity Check Header)
-  const { data: cashAccounts } = await supabase
-    .from("accounts")
-    .select("current_balance")
-    .eq('user_id', user.id)
-    .is("deleted_at", null)
-    .in("type", ["chequing", "savings"]);
-  const totalCash = cashAccounts?.reduce((sum, acc) => sum + Number(acc.current_balance || 0), 0) || 0;
+allAssignedRecords?.forEach(b => {
+  const amount = Number(b.assigned_amount || 0);
+  if (!isNaN(amount) && b.month_year === dbMonthDate) {
+    totalAssignedCurrentMonth += amount;
+  }
+});
 
-  // 7. GOALS
+// D. Calculate Carryover as sum of all category carryover amounts (calculated below in assembly)
+// This will be calculated after we process all subcategories
+let carryoverFromCategories = 0;
+
+  // 6. GOALS
   const { data: goals } = await supabase
     .from("goals")
     .select("*")
@@ -133,7 +148,6 @@ const readyToAssign = totalInflow - totalAssignedAllTime;
     name: cat.name,
     subcategories: cat.subcategories.map((sub: Subcategory) => {
       const budget = monthlyBudgets.find(b => b.subcategory_id === sub.id);
-      const prevBudget = prevMonthBudgets.find(b => b.subcategory_id === sub.id);
       const goal = goals?.find(g => g.subcategory_id === sub.id);
       
       const assigned = Number(budget?.assigned_amount || 0);
@@ -141,12 +155,19 @@ const readyToAssign = totalInflow - totalAssignedAllTime;
 
       // Carryover Engine - Best Practice: Carry over BOTH positive AND negative balances
       // This enforces accountability and prevents hiding overspending
-      const prevAssigned = Number(prevBudget?.assigned_amount || 0);
-      const prevSpent = prevSpentMap[sub.id] || 0;
-      const carryover = prevAssigned - prevSpent;
+      // Calculate: Total ALL-TIME Assigned - Total ALL-TIME Spent (before current month)
+      const allTimeAssignedBeforeCurrentMonth = allAssignedRecords?.filter(b => b.subcategory_id === sub.id && b.month_year < dbMonthDate)
+        .reduce((sum, b) => sum + Number(b.assigned_amount || 0), 0) || 0;
+      const allTimeSpentBeforeCurrent = allTimeSpentBeforeCurrentMonth[sub.id] || 0;
+      
+      // Carryover = Everything assigned before this month - Everything spent before this month
+      const carryover = allTimeAssignedBeforeCurrentMonth - allTimeSpentBeforeCurrent;
 
-      // Available = Assigned + Carryover - Spent
-      const available = assigned + carryover - spent;
+      // Available = Carryover + Assigned this month - Spent this month
+      const available = carryover + assigned - spent;
+      
+      // Add to total carryover
+      carryoverFromCategories += carryover;
 
       // Planned Hierarchy Logic
       let planned = 0;
@@ -184,10 +205,21 @@ const readyToAssign = totalInflow - totalAssignedAllTime;
     })
   }));
 
+  // Calculate Ready to Assign: Carryover + Income This Month - Assigned This Month
+  const readyToAssign = carryoverFromCategories + totalInflowCurrentMonth - totalAssignedCurrentMonth;
+
+  console.log("Final Calculations:", {
+    carryoverFromCategories,
+    totalInflowCurrentMonth,
+    totalAssignedCurrentMonth,
+    readyToAssign
+  });
+
   return {
     readyToAssign,
-    totalCash,
-    totalAssigned: totalAssignedAllTime,
+    carryover: carryoverFromCategories,
+    totalCash: totalInflowCurrentMonth,
+    totalAssigned: totalAssignedCurrentMonth,
     monthYear: rawMonth,
     categories: categoryData || [],
   };

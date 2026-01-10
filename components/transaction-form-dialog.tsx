@@ -35,6 +35,7 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [inflowAmount, setInflowAmount] = useState(0);
   const [readyToAssignId, setReadyToAssignId] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,6 +108,28 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
     };
   }, [isOpen, onClose]);
 
+  // Set initial category when transaction or inflow changes
+  useEffect(() => {
+    if (transaction?.subcategory_id) {
+      setSelectedCategory(transaction.subcategory_id);
+    } else if (inflowAmount > 0 && readyToAssignId) {
+      setSelectedCategory(readyToAssignId);
+    } else {
+      setSelectedCategory('');
+    }
+  }, [transaction, inflowAmount, readyToAssignId]);
+
+  // Calculate outflow/inflow for editing
+  const amount = transaction?.amount || 0;
+  const isExpense = transaction?.type === 'expense' || amount < 0;
+  const isIncome = transaction?.type === 'income' || amount > 0;
+  const defaultOutflow = isExpense ? Math.abs(amount) : 0;
+  const defaultInflow = isIncome ? Math.abs(amount) : 0;
+
+  // Get today's date in YYYY-MM-DD format
+  const today = new Date().toISOString().split('T')[0];
+  const transactionDate = transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : today;
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -128,17 +151,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
       alert('Failed to save transaction. Please try again.');
     }
   };
-
-  // Calculate outflow/inflow for editing
-  const amount = transaction?.amount || 0;
-  const isExpense = transaction?.type === 'expense' || amount < 0;
-  const isIncome = transaction?.type === 'income' || amount > 0;
-  const defaultOutflow = isExpense ? Math.abs(amount) : 0;
-  const defaultInflow = isIncome ? Math.abs(amount) : 0;
-
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
-  const transactionDate = transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : today;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -267,15 +279,15 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
             <select
               id="subcategory_id"
               name="subcategory_id"
-              defaultValue={transaction?.subcategory_id || ''}
-              value={inflowAmount > 0 ? readyToAssignId : undefined}
-              className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
-              disabled={loadingCategories || inflowAmount > 0}
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loadingCategories}
             >
               <option value="">Uncategorized</option>
               {categories.map((category) => (
                 <optgroup key={category.id} label={category.name}>
-                  {category.subcategories?.map((subcategory: any) => (
+                  {category.subcategories?.map((subcategory: Subcategory) => (
                     <option key={subcategory.id} value={subcategory.id}>
                       {subcategory.name}
                     </option>
@@ -284,17 +296,17 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
               ))}
             </select>
             {inflowAmount > 0 && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <div className="text-green-600 mt-0.5">
+                  <div className="text-blue-600 mt-0.5">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-green-900">Income Auto-Assignment</p>
-                    <p className="text-xs text-green-700 mt-1">
-                      This income transaction will be automatically assigned to &quot;Ready to Assign&quot; so you can budget it later.
+                    <p className="text-sm font-medium text-blue-900">Income Category</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      For regular income, select &quot;Ready to Assign&quot;. For account transfers, select &quot;Account Transfer&quot;.
                     </p>
                   </div>
                 </div>

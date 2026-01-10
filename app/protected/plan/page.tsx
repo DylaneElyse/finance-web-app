@@ -55,6 +55,7 @@ type Category = {
 
 type PlanData = {
   readyToAssign: number;
+  carryover: number;
   totalCash: number;
   totalAssigned: number;
   monthYear: string;
@@ -527,9 +528,26 @@ export default function Plan() {
               </div>
             </div>
           </div>
-          <p className="text-green-100 text-sm tabular-nums">
-            Total Cash: {formatCurrency(planData.totalCash)} | Total Assigned: {formatCurrency(planData.totalAssigned)}
-          </p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-green-100 mb-1">Carryover</div>
+              <div className={`font-semibold text-lg tabular-nums ${planData.carryover < 0 ? "text-red-200" : "text-white"}`}>
+                {formatCurrency(planData.carryover)}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-green-100 mb-1">Income This Month</div>
+              <div className="font-semibold text-lg tabular-nums text-white">
+                {formatCurrency(planData.totalCash)}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-green-100 mb-1">Assigned This Month</div>
+              <div className="font-semibold text-lg tabular-nums text-white">
+                {formatCurrency(planData.totalAssigned)}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Budget Categories */}
