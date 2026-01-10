@@ -4,6 +4,7 @@ import { createTransaction, deleteTransaction, updateTransaction } from '@/actio
 import { createSubcategory, createCategory } from '@/actions/categories';
 import { Trash2, Check, X, Pencil, Plus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Account, TransactionWithDetails } from '@/types/finance';
 import type { Tables } from '@/types/supabase';
@@ -55,6 +56,7 @@ interface EditingTransaction {
 }
 
 export function TransactionsTable({ transactions, defaultAccountId }: TransactionsTableProps) {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -240,6 +242,9 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
       if (result.error) {
         alert(result.error);
       } else {
+        // Refresh the page data
+        router.refresh();
+        
         if (addAnother) {
           // Reset form but keep the row open
           setNewTransaction({
@@ -328,6 +333,8 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
       if (result.error) {
         alert(result.error);
       } else {
+        // Refresh the page data
+        router.refresh();
         setEditingTransaction(null);
       }
     } catch (error) {
@@ -346,6 +353,8 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
     setIsDeleting(transactionId);
     try {
       await deleteTransaction(transactionId);
+      // Refresh the page data
+      router.refresh();
     } catch (error) {
       console.error('Error deleting transaction:', error);
       alert('Failed to delete transaction');
@@ -779,9 +788,9 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
                       setShowCategorySuggestions(false);
                       setSelectedCategoryIndex(-1);
                     }, 200)}
-                    placeholder="Type category..."
-                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={loadingSubcategories}
+                    placeholder={newTransaction.inflow ? "Ready to Assign (auto)" : "Type category..."}
+                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-green-50"
+                    disabled={loadingSubcategories || !!newTransaction.inflow}
                   />
                   {showCategorySuggestions && (
                     <div className="absolute z-20 w-full mt-1 bg-white border rounded shadow-lg max-h-40 overflow-y-auto">

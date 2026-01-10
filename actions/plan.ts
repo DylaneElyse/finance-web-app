@@ -139,10 +139,11 @@ const readyToAssign = totalInflow - totalAssignedAllTime;
       const assigned = Number(budget?.assigned_amount || 0);
       const spent = spentMap[sub.id] || 0;
 
-      // Carryover Engine (Simplified Phase 6)
+      // Carryover Engine - Best Practice: Carry over BOTH positive AND negative balances
+      // This enforces accountability and prevents hiding overspending
       const prevAssigned = Number(prevBudget?.assigned_amount || 0);
       const prevSpent = prevSpentMap[sub.id] || 0;
-      const carryover = Math.max(0, prevAssigned - prevSpent);
+      const carryover = prevAssigned - prevSpent;
 
       // Available = Assigned + Carryover - Spent
       const available = assigned + carryover - spent;

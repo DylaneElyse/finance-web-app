@@ -9,6 +9,17 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Account, TransactionWithDetails } from '@/types/finance';
 
+interface Category {
+  id: string;
+  name: string;
+  subcategories?: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+}
+
 interface TransactionFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,26 +31,62 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [inflowAmount, setInflowAmount] = useState(0);
+  const [readyToAssignId, setReadyToAssignId] = useState<string>('');
 
   useEffect(() => {
-    const fetchAccounts = async () => {
+    const fetchData = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
+      
+      // Fetch accounts
+      const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
         .select('*')
         .is('deleted_at', null)
         .order('name', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching accounts:', error);
-      } else if (data) {
-        setAccounts(data);
+      if (accountsError) {
+        console.error('Error fetching accounts:', accountsError);
+      } else if (accountsData) {
+        setAccounts(accountsData);
       }
       setLoadingAccounts(false);
+
+      // Fetch categories and subcategories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select(`
+          id,
+          name,
+          subcategories (
+            id,
+            name
+          )
+        `)
+        .is('deleted_at', null)
+        .order('name', { ascending: true });
+
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+      } else if (categoriesData) {
+        setCategories(categoriesData);
+        
+        // Find "Ready to Assign" subcategory
+        for (const cat of categoriesData) {
+          const readyToAssign = cat.subcategories?.find((sub: Subcategory) => sub.name === 'Ready to Assign');
+          if (readyToAssign) {
+            setReadyToAssignId(readyToAssign.id);
+            break;
+          }
+        }
+      }
+      setLoadingCategories(false);
     };
 
     if (isOpen) {
-      fetchAccounts();
+      fetchData();
     }
   }, [isOpen]);
 
@@ -178,6 +225,13 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
                 defaultValue={defaultOutflow || ''}
                 placeholder="0.00"
                 className="text-red-600 font-semibold"
+                onChange={(e) => {
+                  setInflowAmount(0);
+                  const inflowInput = document.getElementById('inflow') as HTMLInputElement;
+                  if (inflowInput && e.target.value) {
+                    inflowInput.value = '';
+                  }
+                }}
               />
             </div>
 
@@ -192,6 +246,14 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
                 defaultValue={defaultInflow || ''}
                 placeholder="0.00"
                 className="text-green-600 font-semibold"
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  setInflowAmount(value);
+                  const outflowInput = document.getElementById('outflow') as HTMLInputElement;
+                  if (outflowInput && e.target.value) {
+                    outflowInput.value = '';
+                  }
+                }}
               />
             </div>
           </div>
@@ -199,6 +261,46 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
           <p className="text-xs text-slate-500">
             * Enter amount in either Outflow (expenses) or Inflow (income), not both
           </p>
+
+          <div>
+            <Label htmlFor="subcategory_id">Category</Label>
+            <select
+              id="subcategory_id"
+              name="subcategory_id"
+              defaultValue={transaction?.subcategory_id || ''}
+              value={inflowAmount > 0 ? readyToAssignId : undefined}
+              className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              disabled={loadingCategories || inflowAmount > 0}
+            >
+              <option value="">Uncategorized</option>
+              {categories.map((category) => (
+                <optgroup key={category.id} label={category.name}>
+                  {category.subcategories?.map((subcategory: any) => (
+                    <option key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {inflowAmount > 0 && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <div className="text-green-600 mt-0.5">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Income Auto-Assignment</p>
+                    <p className="text-xs text-green-700 mt-1">
+                      This income transaction will be automatically assigned to &quot;Ready to Assign&quot; so you can budget it later.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-3 pt-4">
             <Button
