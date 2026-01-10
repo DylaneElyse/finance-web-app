@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getPlanData, updateAssignedAmount, upsertMonthlyBudget, upsertGoal, getSubcategoryTransactions, getMonthlyBudgetNotes } from "@/actions/plan";
-import { Target, ChevronDown, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, TrendingUp, AlertCircle, Edit2, Plus } from "lucide-react";
+import { getPlanData, updateAssignedAmount, upsertMonthlyBudget, upsertGoal, getSubcategoryTransactions, getMonthlyBudgetNotes, moveMoneyBetweenSubcategories } from "@/actions/plan";
+import { Target, ChevronDown, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, TrendingUp, AlertCircle, Edit2, Plus, ArrowRightLeft } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -100,6 +100,13 @@ export default function Plan() {
   const [dialogSubcategory, setDialogSubcategory] = useState<Subcategory | null>(null);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loadingAllTransactions, setLoadingAllTransactions] = useState(false);
+
+  // Move Money dialog state
+  const [moveMoneyDialogOpen, setMoveMoneyDialogOpen] = useState(false);
+  const [moveFromSubcategoryId, setMoveFromSubcategoryId] = useState('');
+  const [moveToSubcategoryId, setMoveToSubcategoryId] = useState('');
+  const [moveAmount, setMoveAmount] = useState('');
+  const [movingMoney, setMovingMoney] = useState(false);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 7);
@@ -531,25 +538,35 @@ export default function Plan() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-green-100 mb-1">Carryover</div>
-              <div className={`font-semibold text-lg tabular-nums ${planData.carryover < 0 ? "text-red-200" : "text-white"}`}>
-                {formatCurrency(planData.carryover)}
+          <div className="flex items-start justify-between gap-4">
+            <div className="grid grid-cols-3 gap-4 text-sm flex-1">
+              <div className="text-center">
+                <div className="text-green-100 mb-1">Carryover</div>
+                <div className={`font-semibold text-lg tabular-nums ${planData.carryover < 0 ? "text-red-200" : "text-white"}`}>
+                  {formatCurrency(planData.carryover)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-green-100 mb-1">Income This Month</div>
+                <div className="font-semibold text-lg tabular-nums text-white">
+                  {formatCurrency(planData.totalCash)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-green-100 mb-1">Assigned This Month</div>
+                <div className="font-semibold text-lg tabular-nums text-white">
+                  {formatCurrency(planData.totalAssigned)}
+                </div>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-green-100 mb-1">Income This Month</div>
-              <div className="font-semibold text-lg tabular-nums text-white">
-                {formatCurrency(planData.totalCash)}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-green-100 mb-1">Assigned This Month</div>
-              <div className="font-semibold text-lg tabular-nums text-white">
-                {formatCurrency(planData.totalAssigned)}
-              </div>
-            </div>
+            <button
+              onClick={() => setMoveMoneyDialogOpen(true)}
+              className="px-4 py-2 bg-white text-green-700 rounded-lg hover:bg-green-50 transition-colors font-medium text-sm flex items-center gap-2 shadow-md"
+              title="Move money between categories"
+            >
+              <ArrowRightLeft size={16} />
+              Move Money
+            </button>
           </div>
         </div>
 
@@ -1076,6 +1093,147 @@ export default function Plan() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Move Money Dialog */}
+      <Dialog open={moveMoneyDialogOpen} onOpenChange={setMoveMoneyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Move Money Between Categories</DialogTitle>
+            <DialogDescription>
+              Reallocate funds from one subcategory to another for {new Date(planData.monthYear + "-01T12:00:00").toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+                timeZone: "UTC"
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            
+            if (!moveFromSubcategoryId || !moveToSubcategoryId) {
+              alert('Please select both from and to categories');
+              return;
+            }
+            
+            if (moveFromSubcategoryId === moveToSubcategoryId) {
+              alert('Please select different categories');
+              return;
+            }
+            
+            const amount = parseFloat(moveAmount);
+            if (isNaN(amount) || amount <= 0) {
+              alert('Please enter a valid amount');
+              return;
+            }
+            
+            setMovingMoney(true);
+            try {
+              await moveMoneyBetweenSubcategories(
+                moveFromSubcategoryId,
+                moveToSubcategoryId,
+                amount,
+                currentMonth
+              );
+              
+              // Reload data
+              await loadPlanData(currentMonth);
+              
+              // Reset form
+              setMoveFromSubcategoryId('');
+              setMoveToSubcategoryId('');
+              setMoveAmount('');
+              setMoveMoneyDialogOpen(false);
+            } catch (error) {
+              console.error('Error moving money:', error);
+              alert('Failed to move money. Please try again.');
+            } finally {
+              setMovingMoney(false);
+            }
+          }} className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">From Category</label>
+              <select
+                value={moveFromSubcategoryId}
+                onChange={(e) => setMoveFromSubcategoryId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select category...</option>
+                {planData.categories.map((cat) => (
+                  <optgroup key={cat.id} label={cat.name}>
+                    {cat.subcategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name} - Available: {formatCurrency(sub.assigned)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-2">To Category</label>
+              <select
+                value={moveToSubcategoryId}
+                onChange={(e) => setMoveToSubcategoryId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select category...</option>
+                {planData.categories.map((cat) => (
+                  <optgroup key={cat.id} label={cat.name}>
+                    {cat.subcategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name} - Current: {formatCurrency(sub.assigned)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-2">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={moveAmount}
+                onChange={(e) => setMoveAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                This will reduce the assigned amount in the &quot;From&quot; category and increase it in the &quot;To&quot; category
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setMoveMoneyDialogOpen(false);
+                  setMoveFromSubcategoryId('');
+                  setMoveToSubcategoryId('');
+                  setMoveAmount('');
+                }}
+                className="flex-1 px-4 py-2 border rounded-md hover:bg-slate-50 transition-colors text-sm font-medium"
+                disabled={movingMoney}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                disabled={movingMoney}
+              >
+                {movingMoney ? 'Moving...' : 'Move Money'}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Transactions Dialog */}
       <Dialog open={transactionsDialogOpen} onOpenChange={setTransactionsDialogOpen}>

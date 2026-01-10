@@ -269,6 +269,57 @@ export async function updateAssignedAmount(subcategoryId: string, monthYear: str
   return { success: true };
 }
 
+export async function moveMoneyBetweenSubcategories(
+  fromSubcategoryId: string,
+  toSubcategoryId: string,
+  amount: number,
+  monthYear: string
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthenticated");
+
+  const dbMonthDate = `${monthYear}-01`;
+
+  // Get current assigned amounts for both subcategories
+  const { data: budgets } = await supabase
+    .from("monthly_budgets")
+    .select("subcategory_id, assigned_amount")
+    .eq("user_id", user.id)
+    .eq("month_year", dbMonthDate)
+    .in("subcategory_id", [fromSubcategoryId, toSubcategoryId]);
+
+  const fromBudget = budgets?.find(b => b.subcategory_id === fromSubcategoryId);
+  const toBudget = budgets?.find(b => b.subcategory_id === toSubcategoryId);
+
+  const fromAmount = Number(fromBudget?.assigned_amount || 0);
+  const toAmount = Number(toBudget?.assigned_amount || 0);
+
+  // Update both budgets
+  const updates = [
+    {
+      user_id: user.id,
+      subcategory_id: fromSubcategoryId,
+      month_year: dbMonthDate,
+      assigned_amount: fromAmount - amount,
+    },
+    {
+      user_id: user.id,
+      subcategory_id: toSubcategoryId,
+      month_year: dbMonthDate,
+      assigned_amount: toAmount + amount,
+    },
+  ];
+
+  const { error } = await supabase
+    .from("monthly_budgets")
+    .upsert(updates, { onConflict: 'user_id, subcategory_id, month_year' });
+
+  if (error) throw error;
+  revalidatePath("/protected/plan");
+  return { success: true };
+}
+
 export async function upsertMonthlyBudget(data: {
   subcategoryId: string;
   monthYear: string;
