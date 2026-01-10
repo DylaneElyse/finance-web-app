@@ -788,9 +788,9 @@ export function TransactionsTable({ transactions, defaultAccountId }: Transactio
                       setShowCategorySuggestions(false);
                       setSelectedCategoryIndex(-1);
                     }, 200)}
-                    placeholder={newTransaction.inflow ? "Ready to Assign (auto)" : "Type category..."}
-                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-green-50"
-                    disabled={loadingSubcategories || !!newTransaction.inflow}
+                    placeholder="Type category..."
+                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loadingSubcategories}
                   />
                   {showCategorySuggestions && (
                     <div className="absolute z-20 w-full mt-1 bg-white border rounded shadow-lg max-h-40 overflow-y-auto">

@@ -15,7 +15,7 @@ export async function createTransaction(formData: FormData) {
   const date = formData.get('date') as string;
   const payeeName = formData.get('payee') as string;
   const accountId = formData.get('account_id') as string;
-  let subcategoryId = formData.get('subcategory_id') as string || null;
+  const subcategoryId = formData.get('subcategory_id') as string || null;
   const description = formData.get('description') as string || null;
   const outflow = parseFloat(formData.get('outflow') as string) || 0;
   const inflow = parseFloat(formData.get('inflow') as string) || 0;
@@ -27,22 +27,6 @@ export async function createTransaction(formData: FormData) {
   if (inflow > 0) {
     type = 'income';
     amount = inflow; // Positive for income
-    
-    // Allow user to manually select category (e.g., Account Transfer)
-    // If no category selected, default to Ready to Assign
-    if (!subcategoryId) {
-      const { data: readyToAssign } = await supabase
-        .from('subcategories')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', 'Ready to Assign')
-        .is('deleted_at', null)
-        .single();
-      
-      if (readyToAssign) {
-        subcategoryId = readyToAssign.id;
-      }
-    }
   } else if (outflow > 0) {
     type = 'expense';
     amount = -outflow; // Negative for expenses
@@ -105,7 +89,7 @@ export async function updateTransaction(formData: FormData) {
   const date = formData.get('date') as string;
   const payeeName = formData.get('payee') as string;
   const accountId = formData.get('account_id') as string;
-  let subcategoryId = formData.get('subcategory_id') as string || null;
+  const subcategoryId = formData.get('subcategory_id') as string || null;
   const description = formData.get('description') as string || null;
   const outflow = parseFloat(formData.get('outflow') as string) || 0;
   const inflow = parseFloat(formData.get('inflow') as string) || 0;
@@ -117,22 +101,6 @@ export async function updateTransaction(formData: FormData) {
   if (inflow > 0) {
     type = 'income';
     amount = inflow;
-    
-    // Allow user to manually select category (e.g., Account Transfer)
-    // If no category selected, default to Ready to Assign
-    if (!subcategoryId) {
-      const { data: readyToAssign } = await supabase
-        .from('subcategories')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', 'Ready to Assign')
-        .is('deleted_at', null)
-        .single();
-      
-      if (readyToAssign) {
-        subcategoryId = readyToAssign.id;
-      }
-    }
   } else if (outflow > 0) {
     type = 'expense';
     amount = -outflow; // Store expenses as negative

@@ -33,8 +33,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [inflowAmount, setInflowAmount] = useState(0);
-  const [readyToAssignId, setReadyToAssignId] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
@@ -73,15 +71,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
         console.error('Error fetching categories:', categoriesError);
       } else if (categoriesData) {
         setCategories(categoriesData);
-        
-        // Find "Ready to Assign" subcategory
-        for (const cat of categoriesData) {
-          const readyToAssign = cat.subcategories?.find((sub: Subcategory) => sub.name === 'Ready to Assign');
-          if (readyToAssign) {
-            setReadyToAssignId(readyToAssign.id);
-            break;
-          }
-        }
       }
       setLoadingCategories(false);
     };
@@ -108,16 +97,14 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
     };
   }, [isOpen, onClose]);
 
-  // Set initial category when transaction or inflow changes
+  // Set initial category when transaction loads
   useEffect(() => {
     if (transaction?.subcategory_id) {
       setSelectedCategory(transaction.subcategory_id);
-    } else if (inflowAmount > 0 && readyToAssignId) {
-      setSelectedCategory(readyToAssignId);
     } else {
       setSelectedCategory('');
     }
-  }, [transaction, inflowAmount, readyToAssignId]);
+  }, [transaction]);
 
   // Calculate outflow/inflow for editing
   const amount = transaction?.amount || 0;
@@ -238,7 +225,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
                 placeholder="0.00"
                 className="text-red-600 font-semibold"
                 onChange={(e) => {
-                  setInflowAmount(0);
                   const inflowInput = document.getElementById('inflow') as HTMLInputElement;
                   if (inflowInput && e.target.value) {
                     inflowInput.value = '';
@@ -259,8 +245,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
                 placeholder="0.00"
                 className="text-green-600 font-semibold"
                 onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  setInflowAmount(value);
                   const outflowInput = document.getElementById('outflow') as HTMLInputElement;
                   if (outflowInput && e.target.value) {
                     outflowInput.value = '';
@@ -295,23 +279,6 @@ export function TransactionFormDialog({ isOpen, onClose, transaction }: Transact
                 </optgroup>
               ))}
             </select>
-            {inflowAmount > 0 && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <div className="text-blue-600 mt-0.5">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900">Income Category</p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      For regular income, select &quot;Ready to Assign&quot;. For account transfers, select &quot;Account Transfer&quot;.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="flex gap-3 pt-4">
