@@ -28,7 +28,7 @@ export type TransactionWithDetails = Transaction & {
   }) | null
 }
 
-// 4. Budget Tracking (YNAB Style)
+// 4. Budget Tracking 
 export interface CategoryBudgetSummary {
   subcategoryId: string
   subcategoryName: string
