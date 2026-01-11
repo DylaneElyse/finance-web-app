@@ -251,11 +251,15 @@ export default function Plan() {
           totalAssigned: prev.totalAssigned + assignmentDiff,
           categories: prev.categories.map(cat => ({
             ...cat,
-            subcategories: cat.subcategories.map(sub => 
-              sub.id === subcategoryId 
-                ? { ...sub, assigned: amount, available: amount - sub.spent } 
-                : sub
-            )
+            subcategories: cat.subcategories.map(sub => {
+              if (sub.id === subcategoryId) {
+                const newAvailable = sub.carryover + amount - sub.spent;
+                // Fix floating-point precision issues: treat values < 0.01 cents as zero
+                const roundedAvailable = Math.abs(newAvailable) < 0.0001 ? 0 : newAvailable;
+                return { ...sub, assigned: amount, available: roundedAvailable };
+              }
+              return sub;
+            })
           }))
         };
       });
@@ -437,23 +441,6 @@ export default function Plan() {
     return { status: 'ok', color: 'text-green-600', icon: null };
   };
 
-  // Phase 6: Calculate pacing indicator (percentage of month passed vs percentage of budget spent)
-  const calculatePacing = (subcategory: Subcategory) => {
-    if (subcategory.assigned === 0) return 0;
-    
-    const now = new Date();
-    const monthStart = new Date(currentMonth + "-01");
-    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-    
-    const totalDays = monthEnd.getDate();
-    const daysPassed = now.getDate();
-    const percentMonthPassed = (daysPassed / totalDays) * 100;
-    const percentSpent = (subcategory.spent / subcategory.assigned) * 100;
-    
-    // Return difference: negative means under-spending, positive means over-spending
-    return percentSpent - percentMonthPassed;
-  };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -630,8 +617,6 @@ export default function Plan() {
                     ) : (
                       category.subcategories.map((subcategory) => {
                         const status = getOverspendingStatus(subcategory);
-                        const pacing = calculatePacing(subcategory);
-                        const isCurrentMonth = todayMonth && currentMonth === todayMonth;
                         
                         return (
                           <React.Fragment key={subcategory.id}>
@@ -756,35 +741,17 @@ export default function Plan() {
                               )}
                             </td>
                             <td className="px-6 py-4 text-right tabular-nums">
-                              <div className="flex flex-col items-end gap-1">
-                                <span
-                                  className={`font-bold ${
-                                    subcategory.available < 0
-                                      ? "text-red-600"
-                                      : subcategory.available === 0
-                                      ? "text-slate-400"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {formatCurrency(subcategory.available)}
-                                </span>
-                                {/* Phase 6: Pacing Indicator */}
-                                {isCurrentMonth && subcategory.assigned > 0 && (
-                                  <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full transition-all ${
-                                        pacing > 20 ? 'bg-red-500' : 
-                                        pacing > 0 ? 'bg-yellow-500' : 
-                                        'bg-blue-500'
-                                      }`}
-                                      style={{ 
-                                        width: `${Math.min(100, (subcategory.spent / subcategory.assigned) * 100)}%` 
-                                      }}
-                                      title={`Pacing: ${pacing > 0 ? 'over' : 'under'} budget by ${Math.abs(pacing).toFixed(0)}%`}
-                                    />
-                                  </div>
-                                )}
-                              </div>
+                              <span
+                                className={`font-bold ${
+                                  subcategory.available < 0
+                                    ? "text-red-600"
+                                    : subcategory.available === 0
+                                    ? "text-slate-400"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {formatCurrency(subcategory.available)}
+                              </span>
                             </td>
                           </tr>
                           {/* Progress Bar Row */}
@@ -796,17 +763,17 @@ export default function Plan() {
                                 const spent = subcategory.outflow;
                                 
                                 // Determine the max value for the bar (or minimum of 1 to avoid division by zero)
-                                const maxValue = subcategory.planned > 0 ? subcategory.planned : Math.max(total, spent, 1);
+                                const maxValue = subcategory.planned > 0 ? subcategory.planned : Math.max(Math.abs(total), spent, 1);
                                 
                                 // Calculate percentages based on maxValue
-                                const totalPercent = (total / maxValue) * 100;
+                                const totalPercent = (Math.abs(total) / maxValue) * 100;
                                 const spentPercent = (spent / maxValue) * 100;
                                 
                                 return (
                                   <div className="flex items-center gap-2">
                                     {/* Outer light grey shell - always visible */}
                                     <div className="flex-1 h-6 bg-slate-200 rounded overflow-hidden border border-slate-300 relative p-0.5">
-                                      {/* Inner green bar - shows total available funds with slight inset */}
+                                      {/* Green bar - shows positive available funds */}
                                       {total > 0 && (
                                         <div
                                           className="absolute left-1 top-1 bottom-1 bg-green-500 rounded-sm transition-all"
@@ -815,14 +782,34 @@ export default function Plan() {
                                         />
                                       )}
                                       
-                                      {/* Red bar - shows spending, nested inside green with additional inset */}
-                                      {spent > 0 && (
+                                      {/* Red bar for negative balance (carryover deficit) - thin style */}
+                                      {total < 0 && spent === 0 && (
+                                        <div
+                                          className="absolute left-2 top-2 bottom-2 bg-red-500 rounded-sm transition-all"
+                                          style={{ width: `calc(${Math.min(100, totalPercent)}% - 16px)` }}
+                                          title={`Deficit: ${formatCurrency(total)}`}
+                                        />
+                                      )}
+                                      
+                                      {/* Red bar - shows spending when there are funds (thin style) */}
+                                      {spent > 0 && total > 0 && (
                                         <div
                                           className="absolute left-2 top-2 bottom-2 bg-red-500 rounded-sm transition-all"
                                           style={{ 
                                             width: `calc(${Math.min(100, spentPercent)}% - 16px)`,
                                           }}
                                           title={spent > total ? `Overspent by: ${formatCurrency(spent - total)}` : `Spent: ${formatCurrency(spent)}`}
+                                        />
+                                      )}
+                                      
+                                      {/* Red bar - shows spending when starting with deficit (thin style) */}
+                                      {spent > 0 && total <= 0 && (
+                                        <div
+                                          className="absolute left-2 top-2 bottom-2 bg-red-500 rounded-sm transition-all"
+                                          style={{ 
+                                            width: `calc(${Math.min(100, (Math.abs(total) + spent) / maxValue * 100)}% - 16px)`,
+                                          }}
+                                          title={`Total deficit: ${formatCurrency(total - spent)}`}
                                         />
                                       )}
                                     </div>

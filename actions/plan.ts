@@ -185,7 +185,9 @@ let carryoverFromCategories = 0;
         }, 0);
 
       // Available = Carryover + Assigned this month - Spent this month
-      const available = carryover + assigned - spent;
+      let available = carryover + assigned - spent;
+      // Fix floating-point precision issues: treat values < 0.01 cents as zero
+      available = Math.abs(available) < 0.0001 ? 0 : available;
       
       // Add to total carryover
       carryoverFromCategories += carryover;
